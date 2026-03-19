@@ -1,11 +1,24 @@
 import { useRouter } from "expo-router";
-import React from "react";
+import { getAuth } from "firebase/auth";
+import React, { useEffect, useState } from "react";
 import { Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { logOut } from "../../auth";
 import AuthButton from "../../components/AuthButton";
 import { colors } from "../../constants/colors";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const currentUser = getAuth().currentUser;
+    setUser(currentUser);
+  }, []);
+
+  const handleLogout = async () => {
+    await logOut();
+    router.replace("/login");
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -20,15 +33,27 @@ export default function ProfileScreen() {
         <Text style={styles.subtitle}>Your AI Style Companion</Text>
 
         <View style={styles.buttonGroup}>
-          <AuthButton
-            title="Log in"
-            onPress={() => router.push("/login" as any)}
-          />
-          <AuthButton
-            title="Sign up"
-            variant="secondary"
-            onPress={() => router.push("/signup" as any)}
-          />
+          {user ? (
+            <>
+              <Text style={{ marginBottom: 10 }}>
+                Logged in as: {user.email}
+              </Text>
+
+              <AuthButton title="Logout" onPress={handleLogout} />
+            </>
+          ) : (
+            <>
+              <AuthButton
+                title="Log in"
+                onPress={() => router.push("/login" as any)}
+              />
+              <AuthButton
+                title="Sign up"
+                variant="secondary"
+                onPress={() => router.push("/signup" as any)}
+              />
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
