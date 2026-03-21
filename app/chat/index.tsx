@@ -1,3 +1,4 @@
+import { router } from "expo-router"; // ADD THIS
 import React, { useState } from "react";
 import {
   Alert,
@@ -10,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+
 import ChatHeader from "../../components/ChatHeader";
 import ChatInputBar from "../../components/ChatInputBar";
 import Sidebar from "../../components/Sidebar";
@@ -55,7 +57,6 @@ export default function ChatScreen() {
   const handleSuggestionPress = (suggestion: string) => {
     setSelectedSuggestion(suggestion);
     setMessage(suggestion);
-    Alert.alert("Suggestion selected", suggestion);
   };
 
   return (
@@ -90,6 +91,7 @@ export default function ChatScreen() {
             >
               <WelcomeCard />
 
+              {/* SUGGESTIONS */}
               <View style={styles.chipsContainer}>
                 {SUGGESTIONS.map((suggestion) => {
                   const isSelected = selectedSuggestion === suggestion;
@@ -115,6 +117,18 @@ export default function ChatScreen() {
                   );
                 })}
               </View>
+
+              {/* 🔥 MARKETPLACE BUTTON */}
+              {selectedSuggestion && (
+                <Pressable
+                  style={styles.marketplaceButton}
+                  onPress={() => router.push("/marketplace")}
+                >
+                  <Text style={styles.marketplaceText}>
+                    View Suggested Item →
+                  </Text>
+                </Pressable>
+              )}
 
               <View style={styles.emptyState} />
             </ScrollView>
@@ -212,6 +226,21 @@ const styles = StyleSheet.create({
   suggestionTextSelected: {
     color: "#FFFFFF",
   },
+
+  marketplaceButton: {
+    marginTop: 10,
+    backgroundColor: "#2C2C2C",
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: "center",
+  },
+
+  marketplaceText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
   emptyState: {
     flex: 1,
     minHeight: 400,
@@ -235,11 +264,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8E0E0",
     paddingVertical: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
   },
   actionItem: {
     paddingHorizontal: 16,
@@ -251,3 +275,4 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 });
+
