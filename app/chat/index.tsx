@@ -23,6 +23,7 @@ import {
   DEFAULT_SUGGESTION_CHIPS,
   getPersonalizedSuggestions,
 } from "../../services/chatHistoryService";
+import { isFashionRelated, sendMessageToAI } from "../../services/openaiService";
 
 export default function ChatScreen() {
   const authCtx = useContext(AuthContext);
@@ -43,6 +44,8 @@ export default function ChatScreen() {
   const [searchValue, setSearchValue] = useState("");
   const [suggestionChips, setSuggestionChips] = useState<string[]>(DEFAULT_SUGGESTION_CHIPS);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const refreshSuggestions = useCallback(async () => {
@@ -77,35 +80,55 @@ export default function ChatScreen() {
 
   const getOrCreateChatId = (): string => activeChatId ?? createNewChat();
 
+  const sendToAI = async (chatId: string, text: string) => {
+    setIsAiLoading(true);
+    setAiError(null);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    try {
+      const history = (activeChat?.messages ?? []).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const reply = await sendMessageToAI(text, history);
+      addMessage(chatId, "assistant", reply);
+    } catch (e) {
+      console.error("[Aura] OpenAI error:", e);
+      const errMsg = "Sorry, something went wrong. Please try again.";
+      setAiError(errMsg);
+      addMessage(chatId, "assistant", errMsg);
+    } finally {
+      setIsAiLoading(false);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    }
+  };
+
   const handleSend = () => {
     const text = message.trim();
-    if (!text) return;
-    const chatId = getOrCreateChatId();
-    addMessage(chatId, "user", text);
+    if (!text || isAiLoading) return;
     setMessage("");
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-    setTimeout(() => {
+
+    if (!isFashionRelated(text)) {
+      const chatId = getOrCreateChatId();
+      addMessage(chatId, "user", text);
       addMessage(
         chatId,
         "assistant",
-        "Great choice! I am finding the best options for you. (AI response coming soon)"
+        "Sorry, I only help with fashion-related questions. Ask me about outfits, styling, wardrobe tips, and more!"
       );
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-    }, 800);
+      return;
+    }
+
+    const chatId = getOrCreateChatId();
+    addMessage(chatId, "user", text);
+    void sendToAI(chatId, text);
   };
 
   const handleSuggestion = (suggestion: string) => {
+    if (isAiLoading) return;
     const chatId = getOrCreateChatId();
     addMessage(chatId, "user", suggestion);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-    setTimeout(() => {
-      addMessage(
-        chatId,
-        "assistant",
-        "Great choice! I am finding the best options for you. (AI response coming soon)"
-      );
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-    }, 800);
+    void sendToAI(chatId, suggestion);
   };
 
   const hasMessages = (activeChat?.messages?.length ?? 0) > 0;
@@ -166,27 +189,35 @@ export default function ChatScreen() {
                   </View>
                 </>
               ) : (
-                activeChat?.messages.map((msg) => (
-                  <View
-                    key={msg.id}
-                    style={[
-                      styles.bubble,
-                      msg.role === "user" ? styles.userBubble : styles.aiBubble,
-                    ]}
-                  >
-                    {msg.role === "assistant" && (
-                      <Text style={styles.aiLabel}>Aura</Text>
-                    )}
-                    <Text
+                <>
+                  {activeChat?.messages.map((msg) => (
+                    <View
+                      key={msg.id}
                       style={[
-                        styles.bubbleText,
-                        msg.role === "user" ? styles.userBubbleText : styles.aiBubbleText,
+                        styles.bubble,
+                        msg.role === "user" ? styles.userBubble : styles.aiBubble,
                       ]}
                     >
-                      {msg.content}
-                    </Text>
-                  </View>
-                ))
+                      {msg.role === "assistant" && (
+                        <Text style={styles.aiLabel}>Aura</Text>
+                      )}
+                      <Text
+                        style={[
+                          styles.bubbleText,
+                          msg.role === "user" ? styles.userBubbleText : styles.aiBubbleText,
+                        ]}
+                      >
+                        {msg.content}
+                      </Text>
+                    </View>
+                  ))}
+                  {isAiLoading && (
+                    <View style={[styles.bubble, styles.aiBubble]}>
+                      <Text style={styles.aiLabel}>Aura</Text>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                  )}
+                </>
               )}
               <View style={styles.spacer} />
             </ScrollView>
