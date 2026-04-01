@@ -1,4 +1,12 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Audio } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,11 +31,15 @@ import {
   DEFAULT_SUGGESTION_CHIPS,
   getPersonalizedSuggestions,
 } from "../../services/chatHistoryService";
-import { isFashionRelated, sendMessageToAI } from "../../services/openaiService";
+import {
+  isFashionRelated,
+  sendMessageToAI,
+} from "../../services/openaiService";
 
 export default function ChatScreen() {
   const authCtx = useContext(AuthContext);
   const user = authCtx?.user ?? null;
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
   const {
     activeChatId,
@@ -42,7 +54,9 @@ export default function ChatScreen() {
   const [message, setMessage] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const [suggestionChips, setSuggestionChips] = useState<string[]>(DEFAULT_SUGGESTION_CHIPS);
+  const [suggestionChips, setSuggestionChips] = useState<string[]>(
+    DEFAULT_SUGGESTION_CHIPS,
+  );
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -71,6 +85,93 @@ export default function ChatScreen() {
   useEffect(() => {
     void refreshSuggestions();
   }, [refreshSuggestions]);
+  const handleImagePick = async () => {
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          "Please allow access to your photos.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+
+      if (result.canceled) return;
+
+      const imageUri = result.assets[0].uri;
+
+      const chatId = getOrCreateChatId();
+
+      // Show message in chat
+      addMessage(chatId, "user", "📷 Image selected");
+
+      // Send to AI (temporary text-based approach)
+      await sendToAI(chatId, `Describe the outfit in this image: ${imageUri}`);
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Could not pick image.");
+    }
+  };
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert("Permission required", "Microphone access is needed.");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      );
+      await rec.startAsync();
+
+      setRecording(rec);
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Could not start recording.");
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      if (!uri) {
+        Alert.alert("Error", "No recording found.");
+        return;
+      }
+
+      // ✅ For now: simulate speech-to-text
+      const transcript = "Suggest an outfit based on my voice input";
+
+      const chatId = getOrCreateChatId();
+
+      addMessage(chatId, "user", transcript);
+
+      await sendToAI(chatId, transcript);
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Could not process recording.");
+    }
+  };
 
   // After Firestore confirms a save, reload chips so searchHistory is reflected (avoids racing the async persist).
   useEffect(() => {
@@ -113,7 +214,7 @@ export default function ChatScreen() {
       addMessage(
         chatId,
         "assistant",
-        "Sorry, I only help with fashion-related questions. Ask me about outfits, styling, wardrobe tips, and more!"
+        "Sorry, I only help with fashion-related questions. Ask me about outfits, styling, wardrobe tips, and more!",
       );
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
       return;
@@ -149,7 +250,10 @@ export default function ChatScreen() {
                 onChangeSearch={setSearchValue}
                 onClose={() => setShowSidebar(false)}
               />
-              <Pressable style={styles.overlay} onPress={() => setShowSidebar(false)} />
+              <Pressable
+                style={styles.overlay}
+                onPress={() => setShowSidebar(false)}
+              />
             </>
           )}
           <View style={styles.chatArea}>
@@ -165,7 +269,9 @@ export default function ChatScreen() {
                   {showChatLoading && (
                     <View style={styles.syncRow}>
                       <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={styles.syncText}>Loading your saved chats…</Text>
+                      <Text style={styles.syncText}>
+                        Loading your saved chats…
+                      </Text>
                     </View>
                   )}
                   {chatSyncError ? (
@@ -174,8 +280,13 @@ export default function ChatScreen() {
                   <View style={styles.chipsContainer}>
                     {suggestionsLoading && user ? (
                       <View style={styles.chipsLoadingRow}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                        <Text style={styles.syncText}>Updating suggestions…</Text>
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                        <Text style={styles.syncText}>
+                          Updating suggestions…
+                        </Text>
                       </View>
                     ) : (
                       suggestionChips.map((s, i) => (
@@ -195,7 +306,9 @@ export default function ChatScreen() {
                       key={msg.id}
                       style={[
                         styles.bubble,
-                        msg.role === "user" ? styles.userBubble : styles.aiBubble,
+                        msg.role === "user"
+                          ? styles.userBubble
+                          : styles.aiBubble,
                       ]}
                     >
                       {msg.role === "assistant" && (
@@ -204,7 +317,9 @@ export default function ChatScreen() {
                       <Text
                         style={[
                           styles.bubbleText,
-                          msg.role === "user" ? styles.userBubbleText : styles.aiBubbleText,
+                          msg.role === "user"
+                            ? styles.userBubbleText
+                            : styles.aiBubbleText,
                         ]}
                       >
                         {msg.content}
@@ -225,9 +340,13 @@ export default function ChatScreen() {
               <ChatInputBar
                 value={message}
                 onChangeText={setMessage}
-                onPlusPress={() => Alert.alert("Attachments", "Image upload coming soon.")}
-                onImagePress={() => Alert.alert("Image", "Image picker coming soon.")}
-                onMicPress={() => Alert.alert("Voice", "Voice input coming soon.")}
+                onPlusPress={() =>
+                  Alert.alert("Attachments", "Image upload coming soon.")
+                }
+                onImagePress={handleImagePick}
+                onMicPress={() =>
+                  Alert.alert("Voice", "Voice input coming soon.")
+                }
                 onSendPress={handleSend}
               />
             </View>
@@ -279,7 +398,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
-  chipsContainer: { flexDirection: "row", flexWrap: "wrap", marginTop: 4, marginBottom: 10 },
+  chipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+    marginBottom: 10,
+  },
   bubble: {
     maxWidth: "80%",
     borderRadius: 18,
