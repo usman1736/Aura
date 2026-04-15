@@ -1,48 +1,39 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { colors } from "../constants/colors";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
-type ChatInputBarProps = {
-  value: string;
-  onChangeText: (text: string) => void;
-  onPlusPress?: () => void;
-  onImagePress?: () => void;
-  onMicPress?: () => void;
-  onSendPress?: () => void;
-};
-
-export default function ChatInputBar({ value, onChangeText, onPlusPress, onImagePress, onMicPress, onSendPress }: ChatInputBarProps) {
+export default function ChatInputBar({
+  value = "",
+  onChangeText,
+  onImagePress,
+  onMicPress,
+  onSendPress,
+}) {
   const hasText = value.trim().length > 0;
+
   return (
     <View style={styles.wrapper}>
-      <Pressable onPress={onPlusPress} style={styles.plusButton}>
-        <Image source={require("../assets/icons/plus.png")} style={styles.plusIcon} resizeMode="contain" />
-      </Pressable>
       <View style={styles.inputContainer}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder="Ask Aura about your style"
-          placeholderTextColor="#B5AFAF"
+          placeholder="Ask Aura..."
+          placeholderTextColor="#999"
           style={styles.input}
-          multiline
-          returnKeyType="send"
-          blurOnSubmit={false}
-          onSubmitEditing={onSendPress}
         />
+
         <View style={styles.rightIcons}>
           {hasText ? (
             <Pressable onPress={onSendPress} style={styles.sendButton}>
-              <Ionicons name="send" size={17} color="#FFFFFF" />
+              <Ionicons name="send" size={18} color="#fff" />
             </Pressable>
           ) : (
             <>
-              <Pressable onPress={onImagePress} style={styles.actionButton}>
-                <Ionicons name="image-outline" size={19} color={colors.primary} />
+              <Pressable onPress={onImagePress} style={styles.iconBtn}>
+                <Ionicons name="image-outline" size={20} color="#444" />
               </Pressable>
-              <Pressable onPress={onMicPress} style={styles.actionButton}>
-                <Ionicons name="mic-outline" size={19} color={colors.primary} />
+
+              <Pressable onPress={onMicPress} style={styles.iconBtn}>
+                <Ionicons name="mic-outline" size={20} color="#444" />
               </Pressable>
             </>
           )}
@@ -53,12 +44,42 @@ export default function ChatInputBar({ value, onChangeText, onPlusPress, onImage
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingTop: 10, paddingBottom: 12, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: "#EEE7E7" },
-  plusButton: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: "#EFEAEA" },
-  plusIcon: { width: 15, height: 15 },
-  inputContainer: { flex: 1, minHeight: 46, borderRadius: 23, backgroundColor: "#EFEAEA", flexDirection: "row", alignItems: "center", paddingLeft: 14, paddingRight: 8 },
-  input: { flex: 1, fontSize: 13, color: "#3E3A3A", paddingVertical: 10, maxHeight: 100 },
-  rightIcons: { flexDirection: "row", alignItems: "center", marginLeft: 8 },
-  actionButton: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", marginLeft: 2 },
-  sendButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginLeft: 2 },
+  wrapper: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f2f2f2",
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: 14,
+  },
+
+  rightIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  iconBtn: {
+    marginLeft: 8,
+    padding: 4,
+  },
+
+  sendButton: {
+    backgroundColor: "#4F46E5",
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 6,
+  },
 });

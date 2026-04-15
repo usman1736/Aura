@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { getAuth } from "firebase/auth";
-import React from "react";
 import { Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import PrimaryButton from "../components/PrimaryButton";
 
