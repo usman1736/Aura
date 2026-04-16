@@ -1,5 +1,15 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
+import React from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
+
+type ChatInputBarProps = {
+  value?: string;
+  onChangeText: (text: string) => void;
+  onImagePress?: () => void;
+  onMicPress?: () => void;
+  onSendPress: () => void;
+  hasSelectedImage?: boolean;
+};
 
 export default function ChatInputBar({
   value = "",
@@ -7,8 +17,10 @@ export default function ChatInputBar({
   onImagePress,
   onMicPress,
   onSendPress,
-}) {
+  hasSelectedImage = false,
+}: ChatInputBarProps) {
   const hasText = value.trim().length > 0;
+  const canSend = hasText || hasSelectedImage;
 
   return (
     <View style={styles.wrapper}>
@@ -22,7 +34,7 @@ export default function ChatInputBar({
         />
 
         <View style={styles.rightIcons}>
-          {hasText ? (
+          {canSend ? (
             <Pressable onPress={onSendPress} style={styles.sendButton}>
               <Ionicons name="send" size={18} color="#fff" />
             </Pressable>
@@ -51,7 +63,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#eee",
   },
-
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -60,22 +71,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 48,
   },
-
   input: {
     flex: 1,
     fontSize: 14,
   },
-
   rightIcons: {
     flexDirection: "row",
     alignItems: "center",
   },
-
   iconBtn: {
     marginLeft: 8,
     padding: 4,
   },
-
   sendButton: {
     backgroundColor: "#4F46E5",
     padding: 8,

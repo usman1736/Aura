@@ -6,7 +6,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AuthContext } from "./AuthContext";
 import { auth } from "../firebase";
 import {
   ensureUserDoc,
@@ -17,11 +16,23 @@ import {
   saveMessage,
   upsertKeywordFrequencies,
 } from "../services/chatHistoryService";
+import { AuthContext } from "./AuthContext";
+
+export type MessageContent =
+  | string
+  | {
+      type: "text";
+      content: string;
+    }
+  | {
+      type: "image";
+      content: string;
+    };
 
 export interface Message {
   id: string;
   role: "user" | "assistant";
-  content: string;
+  content: MessageContent;
   createdAt: number;
   tags?: string[];
 }
@@ -44,7 +55,11 @@ interface ChatContextType {
   activeChat: Chat | null;
   createNewChat: () => string;
   switchChat: (chatId: string) => void;
-  addMessage: (chatId: string, role: "user" | "assistant", content: string) => void;
+  addMessage: (
+    chatId: string,
+    role: "user" | "assistant",
+    content: MessageContent,
+  ) => void;
   deleteChat: (chatId: string) => void;
   chatSyncStatus: ChatSyncStatus;
   chatSyncError: string | null;
@@ -70,11 +85,10 @@ function buildNewChat(isGuest: boolean, userId: string | null): Chat {
   };
 }
 
-/** When addMessage runs in the same tick as createNewChat, state may not include the new chat yet — use this shell. */
 function buildChatShell(
   chatId: string,
   isGuest: boolean,
-  userId: string | null
+  userId: string | null,
 ): Chat {
   const now = Date.now();
   return {
@@ -110,7 +124,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const messagesLoadedRef = useRef<Set<string>>(new Set());
   const ensuredUserRef = useRef<string | null>(null);
-  /** Mirrors `chats` so addMessage sees createNewChat in the same event tick. */
   const chatsRef = useRef<Chat[]>([]);
 
   const uid = ctxUser?.uid ?? null;
@@ -182,9 +195,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       try {
         const rows = await fetchChatMessages(uid, chatId);
         setChats((prev) =>
-          prev.map((c) =>
-            c.chatId === chatId ? { ...c, messages: rows } : c
-          )
+          prev.map((c) => (c.chatId === chatId ? { ...c, messages: rows } : c)),
         );
       } catch (e) {
         console.error("[Aura] fetchChatMessages failed:", e);
@@ -193,7 +204,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setChatSyncError(`Could not load messages for this chat: ${detail}`);
       }
     },
-    [uid]
+    [uid],
   );
 
   const createNewChat = (): string => {
@@ -201,11 +212,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const isGuest = !writingUid;
     logAuthSnapshot("createNewChat", ctxUser);
     const chat = buildNewChat(isGuest, writingUid);
+
     setChats((prev) => {
       const next = [chat, ...prev];
       chatsRef.current = next;
       return next;
     });
+
     setActiveChatId(chat.chatId);
     messagesLoadedRef.current.add(chat.chatId);
     return chat.chatId;
@@ -226,8 +239,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     chatId: string,
     messageId: string,
     role: "user" | "assistant",
-    content: string,
-    meta: { isFirstUserMessage: boolean; title: string }
+    content: MessageContent,
+    meta: { isFirstUserMessage: boolean; title: string },
   ) => {
     try {
       setChatSyncError(null);
@@ -239,13 +252,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       const sender = role === "assistant" ? "ai" : "user";
 
+      const textToSave =
+        typeof content === "string"
+          ? content
+          : content.type === "text"
+            ? content.content
+            : "[image]";
+
       await saveMessage(userId, chatId, messageId, {
-        text: content,
+        text: textToSave,
         sender,
       });
 
-      if (role === "user") {
-        const keywords = extractFashionKeywords(content);
+      if (role === "user" && textToSave && textToSave !== "[image]") {
+        const keywords = extractFashionKeywords(textToSave);
         if (keywords.length > 0) {
           await upsertKeywordFrequencies(userId, keywords);
           console.log("[Aura] history updated");
@@ -270,7 +290,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         e instanceof Error ? e.message : e ? String(e) : "unknown error";
       console.error("[Aura] Firestore persist failed:", { code, message, e });
       setChatSyncError(
-        code ? `${code}: ${message}` : message || "Could not save to the cloud."
+        code
+          ? `${code}: ${message}`
+          : message || "Could not save to the cloud.",
       );
     }
   };
@@ -278,14 +300,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const addMessage = (
     chatId: string,
     role: "user" | "assistant",
-    content: string
+    content: MessageContent,
   ) => {
     const writingUid = ctxUser?.uid ?? auth.currentUser?.uid ?? null;
     logAuthSnapshot("addMessage", ctxUser);
 
     const msgId = generateId();
+
+    const textContent =
+      typeof content === "string"
+        ? content
+        : content.type === "text"
+          ? content.content
+          : "";
+
     const tags =
-      role === "user" ? extractFashionKeywords(content) : undefined;
+      role === "user" && textContent
+        ? extractFashionKeywords(textContent)
+        : undefined;
+
     const msg: Message = {
       id: msgId,
       role,
@@ -300,21 +333,29 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const shell = buildChatShell(chatId, !writingUid, writingUid);
       base = [shell, ...base];
       if (__DEV__) {
-        console.log("[Aura] addMessage: injected chat shell (same-tick create)", chatId);
+        console.log(
+          "[Aura] addMessage: injected chat shell (same-tick create)",
+          chatId,
+        );
       }
     }
 
     const existing = base.find((c) => c.chatId === chatId);
     if (!existing) {
-      console.error("[Aura] addMessage: chat not found after shell inject", chatId);
+      console.error(
+        "[Aura] addMessage: chat not found after shell inject",
+        chatId,
+      );
       return;
     }
 
     const isFirstUserMessage =
-      existing.messages.length === 0 && role === "user";
+      existing.messages.length === 0 && role === "user" && !!textContent.trim();
+
     const title = isFirstUserMessage
-      ? content.slice(0, 38)
-      : existing.title;
+      ? textContent.slice(0, 38)
+      : existing.title || "New Chat";
+
     const persistMeta = { isFirstUserMessage, title };
 
     const next = base.map((chat) => {
@@ -337,7 +378,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         msgId,
         role,
         content,
-        persistMeta
+        persistMeta,
       );
     } else {
       console.error(
@@ -346,7 +387,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           hasAuthContext: authCtx != null,
           ctxUserUid: ctxUser?.uid ?? null,
           authCurrentUid: auth.currentUser?.uid ?? null,
-        }
+        },
       );
     }
   };
@@ -358,7 +399,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       chatsRef.current = next;
       return next;
     });
-    setActiveChatId((prev) => (prev === chatId ? null : prev));
+    setActiveChatId((prev) => {
+      if (prev !== chatId) return prev;
+      const remaining = chatsRef.current;
+      return remaining[0]?.chatId ?? null;
+    });
   };
 
   return (
