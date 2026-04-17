@@ -29,18 +29,19 @@ export default function ProfileScreen() {
           resizeMode="contain"
         />
 
-        <Text style={styles.title}>Welcome to AURA</Text>
-        <Text style={styles.subtitle}>Your AI Style Companion</Text>
+        <Text style={styles.title}>AURA</Text>
+        <Text style={styles.subtitle}>AI Style Companion</Text>
+
+        {user && (
+          <View style={styles.userSection}>
+            <Text style={styles.loggedLabel}>Logged in as</Text>
+            <Text style={styles.email}>{user.email}</Text>
+          </View>
+        )}
 
         <View style={styles.buttonGroup}>
           {user ? (
-            <>
-              <Text style={{ marginBottom: 10 }}>
-                Logged in as: {user.email}
-              </Text>
-
-              <AuthButton title="Logout" onPress={handleLogout} />
-            </>
+            <AuthButton title="Logout" onPress={handleLogout} />
           ) : (
             <>
               <AuthButton
@@ -65,28 +66,52 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+
   container: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 30,
   },
+
   logo: {
-    width: 86,
-    height: 86,
-    marginBottom: 28,
+    width: 70,
+    height: 70,
+    marginBottom: 16,
   },
+
   title: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "600",
     color: colors.primary,
-    marginBottom: 8,
+    letterSpacing: 2,
   },
+
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#8B7F7F",
-    marginBottom: 44,
+    marginBottom: 40,
   },
+
+  userSection: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+
+  loggedLabel: {
+    fontSize: 11,
+    color: "#A89A9A",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+
+  email: {
+    fontSize: 15,
+    color: colors.primary,
+    fontWeight: "500",
+  },
+
   buttonGroup: {
     width: "100%",
   },
